@@ -1,0 +1,394 @@
+{% extends 'emotion_app/base.html' %}
+
+{% block title %}识别记录{% endblock %}
+
+{% block content %}
+<!-- 添加Chart.js库 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>📊 历史识别记录</h2>
+        <span style="background: var(--bg-color); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; color: var(--text-secondary);">共 {{ records_count }} 条</span>
+    </div>
+    
+    <!-- 情绪可视化图表区域 -->
+    {% if records_count > 0 %}
+    <div style="margin-bottom: 2rem;">
+        <h3 style="margin-bottom: 1rem; color: var(--text-primary);">情绪变化曲线</h3>
+        <div style="background: var(--bg-color); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <canvas id="emotionTrendChart" width="800" height="300"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if records %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                <thead>
+                    <tr style="background-color: #F9FAFB; text-align: left;">
+                        <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">#</th>
+                        <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">时间</th>
+                        <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">图片名称</th>
+                        <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">识别结果</th>
+                        <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                        <tr style="border-bottom: 1px solid #F3F4F6; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#F9FAFB'" onmouseout="this.style.backgroundColor='transparent'">
+                        <td style="padding: 1rem; color: var(--text-secondary);">{{ forloop.counter }}</td>
+                        <td style="padding: 1rem;">{{ record.created_at|date:"Y-m-d H:i" }}</td>
+                        <td style="padding: 1rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ record.image_name }}">{{ record.image_name }}</td>
+                        <td style="padding: 1rem;">
+                            <span style="background: #ECFDF5; color: #065F46; padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.85rem; font-weight: 500;">
+                                {{ record.emotion }}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem;">
+                            <form method="POST" action="{% url 'delete_record' record.id %}" style="display: inline; margin: 0;">
+                                {% csrf_token %}
+                                <button type="submit" 
+                                        style="background: #FFF1F0; color: #FF4D4F; border: 1px solid #FFCCC7; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                        onclick="return confirm('确定要删除这条记录吗？');">
+                                    删除
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 3rem 0; color: var(--text-secondary);">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+            <p>暂无识别记录，快去上传一张图片试试吧！</p>
+        </div>
+    {% endif %}
+
+    <!-- 一键操作按钮 -->
+    {% if records_count > 0 %}
+        <div style="margin: 2rem 0; text-align: center;">
+            <button id="delete-all-btn" 
+                    style="background: #FFF1F0; color: #FF4D4F; border: 1px solid #FFCCC7; 
+                           padding: 0.75rem 1.5rem; border-radius: 8px; 
+                           font-size: 1rem; font-weight: 500; cursor: pointer; 
+                           transition: all 0.2s; margin-right: 1rem;">
+                一键删除所有记录
+            </button>
+        </div>
+    {% endif %}
+    
+    <div style="margin-top: 2rem; text-align: center;">
+        <a href="{% url 'index' %}" class="btn">新建识别</a>
+    </div>
+</div>
+
+<!-- 回收站模态框 -->
+<div id="recycleModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: var(--bg-color); margin: 5% auto; padding: 2rem; border-radius: 12px; width: 80%; max-width: 800px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3>🗑️ 回收站</h3>
+            <button type="button" onclick="closeRecycleModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
+        </div>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">显示最近7天内删除的识别记录，超过7天将自动清理。</p>
+        
+        {% if recycled_count > 0 %}
+            <div style="overflow-x: auto; margin-bottom: 1rem;">
+                <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
+                    <thead>
+                        <tr style="background-color: #F9FAFB; text-align: left;">
+                            <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">#</th>
+                            <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">时间</th>
+                            <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">图片名称</th>
+                            <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">识别结果</th>
+                            <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">删除时间</th>
+                            <th style="padding: 1rem; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid #E5E7EB;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in recycled_records %}
+                            <tr style="border-bottom: 1px solid #F3F4F6; opacity: 0.7;">
+                                <td style="padding: 1rem; color: var(--text-secondary);">{{ forloop.counter }}</td>
+                                <td style="padding: 1rem;">{{ record.created_at|date:"Y-m-d H:i" }}</td>
+                                <td style="padding: 1rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ record.image_name }}">{{ record.image_name }}</td>
+                                <td style="padding: 1rem;">
+                                    <span style="background: #ECFDF5; color: #065F46; padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.85rem; font-weight: 500;">
+                                        {{ record.emotion }}
+                                    </span>
+                                </td>
+                                <td style="padding: 1rem; color: var(--text-secondary); font-size: 0.9rem;">{{ record.deleted_at|date:"Y-m-d H:i" }}</td>
+                                <td style="padding: 1rem; display: flex; gap: 0.5rem;">
+                                    <!-- 恢复按钮 -->
+                                    <form method="POST" action="{% url 'restore_record' record.id %}" style="display: inline; margin: 0;">
+                                        {% csrf_token %}
+                                        <button type="submit" 
+                                                style="background: #F6FFED; color: #52C41A; border: 1px solid #B7EB8F; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                                onclick="return confirm('确定要恢复这条记录吗？');">
+                                            恢复
+                                        </button>
+                                    </form>
+                                    <!-- 彻底删除按钮 -->
+                                    <form method="POST" action="{% url 'permanent_delete_record' record.id %}" style="display: inline; margin: 0;">
+                                        {% csrf_token %}
+                                        <button type="submit" 
+                                                style="background: #FFF1F0; color: #FF4D4F; border: 1px solid #FFCCC7; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                                onclick="return confirm('确定要彻底删除这条记录吗？此操作不可恢复。');">
+                                            彻底删除
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 回收站一键操作按钮 - 放在模态框底部 -->
+            <div style="margin: 2rem 0; text-align: center;">
+                <button id="restore-all-btn" 
+                        style="background: #F6FFED; color: #52C41A; border: 1px solid #B7EB8F; 
+                               padding: 0.75rem 1.5rem; border-radius: 8px; 
+                               font-size: 1rem; font-weight: 500; cursor: pointer; 
+                               transition: all 0.2s; margin-right: 1rem;">
+                    一键恢复所有记录
+                </button>
+                <button id="permanent-delete-all-btn" 
+                        style="background: #FFF1F0; color: #FF4D4F; border: 1px solid #FFCCC7; 
+                               padding: 0.75rem 1.5rem; border-radius: 8px; 
+                               font-size: 1rem; font-weight: 500; cursor: pointer; 
+                               transition: all 0.2s;">
+                    一键彻底删除所有记录
+                </button>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 3rem 0; color: var(--text-secondary);">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🗑️</div>
+                <p>回收站为空</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 回收站按钮 -->
+<div style="position: fixed; bottom: 2rem; right: 2rem; z-index: 999;">
+    <button onclick="openRecycleModal()" 
+            style="background: #FFF1F0; color: #FF4D4F; border: 2px solid #FFCCC7; padding: 1rem 1.5rem; border-radius: 50%; font-size: 1.2rem; cursor: pointer; box-shadow: 0 4px 12px rgba(255, 77, 79, 0.2); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"
+            title="查看回收站">
+        🗑️
+        {% if recycled_count > 0 %}
+            <span style="background: #FF4D4F; color: white; font-size: 0.8rem; font-weight: bold; border-radius: 12px; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">{{ recycled_count }}</span>
+        {% endif %}
+    </button>
+</div>
+
+<script>
+    // 打开回收站模态框
+    function openRecycleModal() {
+        document.getElementById('recycleModal').style.display = 'block';
+    }
+    
+    // 关闭回收站模态框
+    function closeRecycleModal() {
+        document.getElementById('recycleModal').style.display = 'none';
+    }
+    
+    // 点击模态框外部关闭
+    window.onclick = function(event) {
+        const modal = document.getElementById('recycleModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // 一键删除所有记录
+    document.getElementById('delete-all-btn')?.addEventListener('click', function() {
+        if (confirm('确定要删除所有记录吗？此操作可以在回收站中恢复。')) {
+            // 创建表单并提交
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url 'delete_all_records' %}';
+            form.innerHTML = '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+    
+    // 一键恢复所有记录
+    document.getElementById('restore-all-btn')?.addEventListener('click', function() {
+        if (confirm('确定要恢复所有记录吗？')) {
+            // 创建表单并提交
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url 'restore_all_records' %}';
+            form.innerHTML = '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+    
+    // 一键彻底删除所有记录
+    document.getElementById('permanent-delete-all-btn')?.addEventListener('click', function() {
+        if (confirm('确定要彻底删除所有记录吗？此操作不可恢复！')) {
+            // 创建表单并提交
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url 'permanent_delete_all_records' %}';
+            form.innerHTML = '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+</script>
+
+{% if records_count > 0 %}
+<!-- 环形折线图：情绪出现次数分析 -->
+<script>
+    // 情绪颜色
+    const emotionColorMap = {
+        '愤怒': '#FF4D4F',
+        '厌恶': '#9254DE',
+        '恐惧': '#F5222D',
+        '悲伤': '#1890FF',
+        '中立': '#8C8C8C',
+        '惊讶': '#FAAD14',
+        '开心': '#52C41A'
+    };
+    
+    // 情绪类型列表
+    const emotionTypes = ['愤怒', '厌恶', '恐惧', '悲伤', '中立', '惊讶', '开心'];
+    
+    // 准备数据
+    const timelineData = [
+        {% for item in emotion_timeline %}
+        {
+            time: '{{ item.time }}',
+            emotion: '{{ item.emotion }}'
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // 统计每种情绪的出现次数
+    const emotionStats = {
+        '愤怒': { count: 0 },
+        '厌恶': { count: 0 },
+        '恐惧': { count: 0 },
+        '悲伤': { count: 0 },
+        '中立': { count: 0 },
+        '惊讶': { count: 0 },
+        '开心': { count: 0 }
+    };
+    
+    // 计算每种情绪的出现次数
+    timelineData.forEach(item => {
+        if (emotionStats[item.emotion]) {
+            emotionStats[item.emotion].count++;
+        }
+    });
+    
+    // 准备环形折线图数据
+    const chartData = emotionTypes.map(emotion => {
+        return {
+            emotion: emotion,
+            value: emotionStats[emotion].count,
+            color: emotionColorMap[emotion]
+        };
+    });
+    
+    // 提取数据值
+    const dataValues = chartData.map(item => item.value);
+    const dataLabels = chartData.map(item => item.emotion);
+    const dataColors = chartData.map(item => item.color);
+    
+    // 计算动态最大值：取实际数据的最大值，向上取整到最近的5，确保图表有适当的留白
+    const maxValue = Math.max(...dataValues);
+    const dynamicMax = maxValue > 0 ? Math.ceil(maxValue / 5) * 5 : 10;
+    
+    // 创建环形折线图
+    const ctx = document.getElementById('emotionTrendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: dataLabels,
+            datasets: [{
+                label: '情绪出现次数',
+                data: dataValues,
+                borderColor: '#1890FF',
+                backgroundColor: 'rgba(24, 144, 255, 0.2)',
+                borderWidth: 3,
+                pointBackgroundColor: dataColors,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 8,
+                pointHoverRadius: 10,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            height: 400,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '情绪综合分析',
+                    font: {
+                        size: 20,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const emotion = dataLabels[context.dataIndex];
+                            const count = context.parsed.r;
+                            return `${emotion}: 出现${count}次`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: dynamicMax,
+                    min: 0,
+                    ticks: {
+                        // 动态调整刻度间隔，确保有5-6个刻度
+                        stepSize: Math.ceil(dynamicMax / 5),
+                        callback: function(value) {
+                            return value;
+                        }
+                    },
+                    grid: {
+                        circular: true,
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    angleLines: {
+                        color: 'rgba(0, 0, 0, 0.2)'
+                    },
+                    pointLabels: {
+                        font: {
+                            size: 12,
+                            weight: '500'
+                        },
+                        color: '#333'
+                    }
+                }
+            },
+            elements: {
+                line: {
+                    borderJoinStyle: 'round'
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

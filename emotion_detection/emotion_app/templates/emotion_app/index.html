@@ -1,0 +1,63 @@
+{% extends 'emotion_app/base.html' %}
+
+{% block title %}情感识别{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h2>📸 上传图片进行识别</h2>
+        <p style="color: var(--text-secondary);">请上传一张包含清晰人脸的图片，我们将自动分析其面部表情。</p>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <div class="alert {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" style="max-width: 500px; margin: 0 auto;">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="image" style="cursor: pointer;">
+                <div style="border: 2px dashed #D1D5DB; padding: 2rem; text-align: center; border-radius: 8px; background: #F9FAFB; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--primary-color)'; this.style.background='#EEF2FF'" onmouseout="this.style.borderColor='#D1D5DB'; this.style.background='#F9FAFB'">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📂</div>
+                    <span style="color: var(--text-secondary);">点击选择或拖拽图片到此处</span>
+                </div>
+            </label>
+            <input type="file" id="image" name="image" accept="image/*" required style="display: none;" onchange="document.querySelector('.file-name').textContent = this.files[0].name">
+            <p class="file-name" style="text-align: center; margin-top: 0.5rem; color: var(--primary-color); font-weight: 500;"></p>
+        </div>
+        <button type="submit" class="btn" style="width: 100%;">🚀 开始识别</button>
+    </form>
+</div>
+
+{% if result %}
+    <div class="card" style="border-left: 5px solid var(--primary-color);">
+        <h3 style="margin-bottom: 1.5rem;">识别报告</h3>
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start;">
+            {% if uploaded_image_url %}
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: block;">原始图片</label>
+                    <img src="{{ uploaded_image_url }}" alt="Uploaded" class="image-preview" style="max-height: 300px; object-fit: cover;">
+                </div>
+            {% endif %}
+
+            <div style="flex: 1; min-width: 250px;">
+                <div style="background: #F3F4F6; padding: 1.5rem; border-radius: 8px;">
+                    <div style="margin-bottom: 1.5rem;">
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">检测到的情感</span>
+                        <div style="font-size: 2.5rem; font-weight: 800; color: var(--primary-color); line-height: 1.2;">
+                            {{ result.emotion }}
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem;">
+                    <a href="{% url 'records' %}" class="btn btn-secondary" style="font-size: 0.9rem;">查看历史记录</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

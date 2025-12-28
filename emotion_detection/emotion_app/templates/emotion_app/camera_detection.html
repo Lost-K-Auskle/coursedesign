@@ -1,0 +1,175 @@
+{% extends 'emotion_app/base.html' %}
+
+{% block title %}摄像头识别{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📸 摄像头情感识别</h2>
+    
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert {% if message.tags %}{{ message.tags }}{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h3 style="color: var(--text-primary); margin-bottom: 1rem;">实时摄像头画面</h3>
+        
+        <!-- 摄像头视频流 -->
+        <div style="display: inline-block; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            <video id="video" width="640" height="480" autoplay playsinline style="background: #000;"></video>
+            
+            <!-- 拍摄按钮 -->
+            <button id="capture-btn" 
+                    style="position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); 
+                           background: #4F46E5; color: white; border: none; 
+                           width: 60px; height: 60px; border-radius: 50%; 
+                           font-size: 1.2rem; cursor: pointer; 
+                           box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); 
+                           transition: all 0.2s;">
+                📷
+            </button>
+        </div>
+        
+        <!-- 拍摄按钮文字说明 -->
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem;">点击拍摄按钮定格照片</p>
+    </div>
+    
+    <!-- 拍摄预览区域 -->
+    <div id="preview-section" style="display: none; margin: 2rem 0; text-align: center;">
+        <h3 style="color: var(--text-primary); margin-bottom: 1rem;">拍摄预览</h3>
+        <div style="display: inline-block; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+            <img id="preview" width="640" height="480" style="display: block;">
+        </div>
+        
+        <form id="detection-form" method="POST" action="{% url 'camera_detection' %}">
+            {% csrf_token %}
+            <input type="hidden" id="image_data" name="image_data">
+            
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button type="button" id="retake-btn" 
+                        style="background: #6B7280; color: white; border: none; 
+                               padding: 0.75rem 1.5rem; border-radius: 8px; 
+                               font-size: 1rem; font-weight: 500; 
+                               cursor: pointer; transition: all 0.2s;" 
+                        onclick="retakePhoto()">
+                    重新拍摄
+                </button>
+                
+                <button type="submit" 
+                        style="background: #4F46E5; color: white; border: none; 
+                               padding: 0.75rem 1.5rem; border-radius: 8px; 
+                               font-size: 1rem; font-weight: 500; 
+                               cursor: pointer; transition: all 0.2s;" 
+                        onclick="return confirm('确定要提交检测吗？')">
+                    提交检测
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- 识别结果区域 -->
+    {% if result %}
+    <div style="margin-top: 2rem; padding: 2rem; background: #F0F9FF; border-radius: 8px; border: 1px solid #BAE6FD;">
+        <h3 style="color: #0369A1; margin-bottom: 1rem;">识别结果</h3>
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <div style="flex-shrink: 0;">
+                <img src="data:image/jpeg;base64,{{ result.captured_image }}" alt="识别图片" width="120" height="120" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            </div>
+            <div>
+                <h4 style="font-size: 1.2rem; color: #0C4A6E; margin-bottom: 0.5rem;">识别到的情感：</h4>
+                <span style="background: #ECFDF5; color: #065F46; padding: 0.5rem 1rem; border-radius: 99px; font-size: 1.1rem; font-weight: 600;">
+                    {{ result.emotion }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 2rem; text-align: center;">
+        <a href="{% url 'camera_detection' %}" class="btn">继续识别</a>
+        <a href="{% url 'index' %}" class="btn" style="margin-left: 1rem;">返回主页</a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // 获取视频元素
+    const video = document.getElementById('video');
+    const captureBtn = document.getElementById('capture-btn');
+    const preview = document.getElementById('preview');
+    const previewSection = document.getElementById('preview-section');
+    const imageDataInput = document.getElementById('image_data');
+    
+    // 请求摄像头权限并显示视频流
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+        })
+        .catch(err => {
+            console.error('无法访问摄像头:', err);
+            alert('无法访问摄像头，请检查您的浏览器权限设置。');
+        });
+    
+    // 拍摄照片
+    captureBtn.addEventListener('click', () => {
+        // 创建canvas用于绘制当前视频帧
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // 获取canvas上下文并绘制视频帧
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // 创建一个临时canvas用于压缩图片到40*40
+        const resizeCanvas = document.createElement('canvas');
+        const resizeCtx = resizeCanvas.getContext('2d');
+        resizeCanvas.width = 40;
+        resizeCanvas.height = 40;
+        
+        // 将原始图片绘制到40*40的canvas上
+        resizeCtx.drawImage(canvas, 0, 0, 40, 40);
+        
+        // 将40*40的canvas转换为Base64编码的图片数据
+        const imageData = resizeCanvas.toDataURL('image/jpeg', 0.8);
+        
+        // 显示预览（使用原始大小的预览）
+        preview.src = canvas.toDataURL('image/jpeg', 0.8);
+        previewSection.style.display = 'block';
+        
+        // 设置表单数据（使用压缩后的40*40图片）
+        imageDataInput.value = imageData;
+        
+        // 暂停视频
+        video.pause();
+    });
+    
+    // 重新拍摄
+    function retakePhoto() {
+        // 隐藏预览区域
+        previewSection.style.display = 'none';
+        
+        // 重置表单数据
+        imageDataInput.value = '';
+        
+        // 恢复视频播放
+        video.play();
+    }
+    
+    // 初始化
+    window.addEventListener('load', () => {
+        // 自动请求摄像头权限
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error('无法访问摄像头:', err);
+            });
+    });
+</script>
+{% endblock %}
