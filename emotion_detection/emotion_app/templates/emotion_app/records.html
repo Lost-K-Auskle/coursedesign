@@ -93,7 +93,7 @@
             <button type="button" onclick="closeRecycleModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
         </div>
         
-        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">显示最近7天内删除的识别记录，超过7天将自动清理。</p>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">显示最近{{ recycle_days }}天内删除的识别记录，超过{{ recycle_days }}天将自动清理。</p>
         
         {% if recycled_count > 0 %}
             <div style="overflow-x: auto; margin-bottom: 1rem;">

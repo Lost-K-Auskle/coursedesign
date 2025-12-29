@@ -272,7 +272,8 @@ def records_view(request):
         'emotion_timeline': emotion_timeline,
         'emotion_count': emotion_count,
         'recycled_records': recycled_records,
-        'recycled_count': recycled_records.count()
+        'recycled_count': recycled_records.count(),
+        'recycle_days': recycle_days
     })
 
 # 恢复删除的记录视图
