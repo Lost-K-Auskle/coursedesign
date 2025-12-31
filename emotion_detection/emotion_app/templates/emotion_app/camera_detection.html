@@ -21,7 +21,7 @@
         
         <!-- 摄像头视频流 -->
         <div style="display: inline-block; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <video id="video" width="640" height="480" autoplay playsinline style="background: #000;"></video>
+            <video id="video" width="480" height="480" autoplay playsinline style="background: #000;"></video>
             
             <!-- 拍摄按钮 -->
             <button id="capture-btn" 
@@ -84,6 +84,12 @@
                 <h4 style="font-size: 1.2rem; color: #0C4A6E; margin-bottom: 0.5rem;">识别到的情感：</h4>
                 <span style="background: #ECFDF5; color: #065F46; padding: 0.5rem 1rem; border-radius: 99px; font-size: 1.1rem; font-weight: 600;">
                     {{ result.emotion }}
+                </span>
+            </div>
+            <div>
+                <h4 style="font-size: 1.2rem; color: #0C4A6E; margin-bottom: 0.5rem;">置信度：</h4>
+                <span style="background: #ECFDF5; color: #065F46; padding: 0.5rem 1rem; border-radius: 99px; font-size: 1.1rem; font-weight: 600;">
+                    {{ result.confidence }}%
                 </span>
             </div>
         </div>

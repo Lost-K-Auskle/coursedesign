@@ -193,9 +193,10 @@ def index_view(request):
                     exp_logits = np.exp(logits - max_logit)  # 数值稳定的softmax
                     softmax = exp_logits / np.sum(exp_logits)
                     confidence = float(np.max(softmax) * 100)
+                    if confidence == 100: confidence -= 0.01
                 else:
                     confidence = 0.0
-                    
+                result['confidence']=round(confidence,2)
                 # 读取图片数据
                 image_data = None
                 image_content_type = None
@@ -563,9 +564,10 @@ def camera_detection_view(request):
                     exp_logits = np.exp(logits - max_logit)  # 数值稳定的softmax
                     softmax = exp_logits / np.sum(exp_logits)
                     confidence = float(np.max(softmax) * 100)
+                    if confidence==100:confidence-=0.01
                 else:
                     confidence = 0.0
-                    
+                result['confidence'] = round(confidence, 2)
                 # 将Base64编码的图片数据转换为二进制数据
                 image_bytes = base64.b64decode(image_data)
                 
